@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Email password scanner</title>
+<meta name="description" content="Generate ranked password candidates from an email address. Runs entirely in the browser.">
+<style>
+:root{
+  --host-bg:#ffffff; --host-fg:#111827; --host-fg-muted:#6b7280;
+  --host-card:#f9fafb; --host-card-fg:#111827; --host-input:#ffffff;
+  --host-muted:#f3f4f6; --host-border:#e5e7eb; --host-border-hover:#9ca3af;
+  --host-primary:#2563eb; --host-secondary:#f3f4f6; --host-secondary-fg:#111827;
+  --host-success:#16a34a; --host-error:#dc2626;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --host-bg:#0b0f14; --host-fg:#e5e7eb; --host-fg-muted:#9ca3af;
+    --host-card:#131a22; --host-card-fg:#e5e7eb; --host-input:#0f151c;
+    --host-muted:#1b2430; --host-border:#2a3441; --host-border-hover:#4b5563;
+    --host-primary:#3b82f6; --host-secondary:#1b2430; --host-secondary-fg:#e5e7eb;
+    --host-success:#22c55e; --host-error:#f87171;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--host-bg);color:var(--host-fg);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
+main{max-width:820px;margin:0 auto;padding:28px 18px 60px}
+header{margin-bottom:16px}
+.kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--host-fg-muted);margin-bottom:6px}
+h1{font-size:24px;font-weight:500;margin:0 0 8px}
+.sub{margin:0;font-size:13px;line-height:1.55;color:var(--host-fg-muted);max-width:620px}
+.card{background:var(--host-card);border:1px solid var(--host-border);border-radius:12px;padding:14px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fld{display:block;margin-bottom:10px}
+.fld>span{display:block;font-size:12px;color:var(--host-fg-muted);margin-bottom:5px;line-height:1.5}
+.fld em{font-style:normal;opacity:.65}
+input[type=text],input[type=email],input[type=date],input[type=url]{
+  width:100%;padding:9px 10px;font-size:14px;font-family:inherit;
+  background:var(--host-input);color:var(--host-fg);border:1px solid var(--host-border);border-radius:8px;outline:none}
+input:focus{border-color:var(--host-border-hover)}
+textarea{width:100%;padding:9px 10px;font-size:13px;font-family:ui-monospace,monospace;
+  background:var(--host-input);color:var(--host-fg);border:1px solid var(--host-border);border-radius:8px;outline:none;resize:vertical;margin-bottom:8px}
+.opts{display:flex;flex-wrap:wrap;gap:12px;padding:8px 0 10px}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--host-fg-muted);cursor:pointer}
+.chk input{accent-color:var(--host-primary)}
+.symRow{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.lbl{font-size:12px;color:var(--host-fg-muted)}
+.dim{opacity:.6}
+.symBoxes{display:flex;gap:4px;flex-wrap:wrap}
+.symBoxes label{width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--host-border);border-radius:6px;font-family:ui-monospace,monospace;font-size:13px;cursor:pointer}
+.symBoxes input{display:none}
+.symBoxes label:has(input:checked){border-color:var(--host-primary);background:var(--host-muted)}
+.symBoxes input:checked+span{color:var(--host-primary);font-weight:600}
+.packsHead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-top:6px;border-top:1px solid var(--host-border);flex-wrap:wrap}
+.runRow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:8px;border-top:1px solid var(--host-border);flex-wrap:wrap}
+.cap{display:flex;align-items:center;gap:8px}
+.cap input[type=range]{width:150px;accent-color:var(--host-primary)}
+.cap output{font-family:ui-monospace,monospace;font-size:12px;min-width:30px}
+button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:13px}
+.primary{background:var(--host-primary);color:#fff;padding:10px 22px;font-weight:500}
+.secondary{background:var(--host-secondary);color:var(--host-secondary-fg);padding:9px 14px;border-color:var(--host-border);white-space:nowrap}
+.mini{background:transparent;color:var(--host-fg-muted);border:1px solid var(--host-border);padding:4px 9px;font-size:11px;white-space:nowrap}
+.mini:hover{color:var(--host-fg);border-color:var(--host-border-hover)}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--host-fg-muted)}
+.barStats span:not(.dot){color:var(--host-fg);font-family:ui-monospace,monospace}
+.dot{opacity:.4;margin:0 4px}
+.barBtns{display:flex;gap:6px;flex-wrap:wrap}
+.tblWrap{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}
+th{text-align:left;font-size:11px;font-weight:500;color:var(--host-fg-muted);padding:6px 8px;border-bottom:1px solid var(--host-border);text-transform:uppercase;letter-spacing:.06em}
+td{padding:0 8px;border-bottom:1px solid var(--host-border);height:32px}
+.cNum{width:42px}.cLen{width:44px}.cScore{width:58px}.cAct{width:120px}
+tbody tr:hover{background:var(--host-muted);cursor:pointer}
+tbody tr.hit{background:color-mix(in srgb,var(--host-success) 14%,transparent)}
+tbody tr.hit td{color:var(--host-success)}
+.num{font-family:ui-monospace,monospace;color:var(--host-fg-muted);font-size:11px}
+.pw{font-family:ui-monospace,monospace;font-size:13px;word-break:break-all}
+.score{font-family:ui-monospace,monospace;font-size:11px;color:var(--host-fg-muted)}
+.actCell{display:flex;gap:4px;justify-content:flex-end}
+.tick,.open{width:26px;height:22px;border:1px solid var(--host-border);background:transparent;color:var(--host-fg-muted);font-size:11px;line-height:1;border-radius:5px}
+.tick.on{background:var(--host-success);border-color:var(--host-success);color:#fff}
+.empty{text-align:center;font-size:12px;color:var(--host-fg-muted);padding:22px 10px;border:1px dashed var(--host-border);border-radius:10px;margin-bottom:14px}
+.found{border:1px solid var(--host-success);border-radius:12px;padding:10px 12px;margin-bottom:14px;background:color-mix(in srgb,var(--host-success) 10%,transparent)}
+.foundHead{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:500;color:var(--host-success);margin-bottom:6px}
+.foundList{display:flex;flex-wrap:wrap;gap:6px}
+.foundList span{font-family:ui-monospace,monospace;font-size:12px;background:var(--host-card);border:1px solid var(--host-success);color:var(--host-fg);padding:2px 8px;border-radius:5px}
+.verify .vHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.badge{font-size:10px;border:1px solid var(--host-border);border-radius:20px;padding:1px 8px;color:var(--host-fg-muted)}
+.badge.on{border-color:var(--host-success);color:var(--host-success)}
+.hint{font-size:11px;color:var(--host-fg-muted);margin:0 0 8px;line-height:1.5}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--host-muted);padding:1px 4px;border-radius:3px}
+.vRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vRow input{flex:1;min-width:180px}
+.vLog{font-family:ui-monospace,monospace;font-size:11px;color:var(--host-fg-muted);margin-top:8px;line-height:1.6;white-space:pre-wrap}
+.imp summary{font-size:12px;color:var(--host-fg-muted);cursor:pointer;outline:none}
+.imp[open] summary{margin-bottom:8px;color:var(--host-fg)}
+.foot{font-size:11px;color:var(--host-fg-muted);line-height:1.6;margin:0}
+.toast{position:fixed;right:16px;bottom:16px;background:var(--host-success);color:#fff;font-size:12px;padding:6px 12px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+@media (max-width:600px){ .grid2{grid-template-columns:1fr} .cScore{display:none} }
+</style>
+</head>
+<body>
+<main>
+<h1 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Email password candidate generator</h1>
+
+<header>
+  <div class="kicker">wordlist studio</div>
+  <h1>Email password scanner</h1>
+  <p class="sub">Pulls name tokens from the address, blends DOB numbers, symbols, leet swaps and rule packs, ranks everything by real-world probability, then lets you mark hits as you test. Max 500 candidates.</p>
+</header>
+
+<div id="foundPanel" class="found" hidden>
+  <div class="foundHead"><span id="foundTitle">Hits</span><button id="clearHits" class="mini">clear</button></div>
+  <div id="foundList" class="foundList"></div>
+</div>
+
+<section class="card">
+  <div class="grid2">
+    <label class="fld"><span>target email</span>
+      <input id="email" type="email" placeholder="jane.doe@example.com" autocomplete="off" spellcheck="false"></label>
+    <label class="fld"><span>date of birth <em>optional</em></span>
+      <input id="dob" type="date"></label>
+  </div>
+
+  <label class="fld"><span>extra names / words <em>comma separated — partner, kids, pets, company, nickname</em></span>
+    <input id="names" type="text" placeholder="jane, doe, janedoe, smith, max, acme" autocomplete="off" spellcheck="false"></label>
+
+  <label class="fld"><span>extra numbers <em>comma separated — house number, phone tail, lucky number</em></span>
+    <input id="nums" type="text" placeholder="1987, 42, 1234" autocomplete="off" spellcheck="false"></label>
+
+  <div class="opts">
+    <label class="chk"><input type="checkbox" id="oCap" checked> case variants</label>
+    <label class="chk"><input type="checkbox" id="oLeet" checked> leet swaps</label>
+    <label class="chk"><input type="checkbox" id="oSym" checked> symbols</label>
+    <label class="chk"><input type="checkbox" id="oDob" checked> date of birth</label>
+    <label class="chk"><input type="checkbox" id="oPair" checked> name pairs</label>
+  </div>
+
+  <div class="symRow"><span class="lbl">symbol set</span><div id="symBoxes" class="symBoxes"></div></div>
+
+  <div class="packsHead">
+    <span class="lbl">rule packs</span>
+    <span class="lbl dim">expands the list with realistic structures</span>
+  </div>
+  <div class="opts">
+    <label class="chk"><input type="checkbox" id="oMonth" checked> month + year</label>
+    <label class="chk"><input type="checkbox" id="oComp" checked> company from domain</label>
+    <label class="chk"><input type="checkbox" id="oBase" checked> common base words</label>
+    <label class="chk"><input type="checkbox" id="oWalk"> keyboard walks</label>
+    <label class="chk"><input type="checkbox" id="oDouble" checked> doubled name</label>
+    <label class="chk"><input type="checkbox" id="oPat" checked> custom pattern</label>
+  </div>
+
+  <label class="fld"><span>custom pattern <em>placeholders: {n} name · {N} Title · {y} year · {yy} 2-digit year · {mon} month · {Mon} Month · {d} day · {c} company · {s} symbol · {num} number</em></span>
+    <input id="pat" type="text" value="{N}{num}{s}" placeholder="{N}{y}{s}" autocomplete="off" spellcheck="false"></label>
+
+  <div class="runRow">
+    <div class="cap"><span class="lbl">max candidates</span>
+      <input id="cap" type="range" min="50" max="500" step="25" value="500"><output id="capOut">500</output></div>
+    <button id="go" class="primary">generate</button>
+  </div>
+</section>
+
+<details class="card imp">
+  <summary>import an existing list instead</summary>
+  <p class="hint">Paste one password per line, or load a <code>.txt</code>/<code>.csv</code> file. First column wins on CSV, header rows are skipped, order is preserved. Replaces the generated list.</p>
+  <textarea id="paste" rows="5" placeholder="Summer2024!&#10;Acme@123&#10;jane.doe"></textarea>
+  <div class="vRow">
+    <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv">
+    <button id="loadList" class="secondary">load list</button>
+  </div>
+</details>
+
+<div id="bar" class="bar" hidden>
+  <div class="barStats">
+    <span id="statTotal">0</span> candidates <span class="dot">·</span>
+    <span id="statHit">0</span> found <span class="dot">·</span>
+    <span id="statLeft">0</span> left
+  </div>
+  <div class="barBtns">
+    <button id="copyAll" class="mini">copy all</button>
+    <button id="dlTxt" class="mini">.txt</button>
+    <button id="dlCsv" class="mini">.csv</button>
+    <button id="notify" class="mini">alerts off</button>
+    <button id="openLogin" class="mini">login page</button>
+  </div>
+</div>
+
+<div class="tblWrap">
+  <table id="tbl" hidden>
+    <thead><tr><th class="cNum">#</th><th class="cPw">candidate</th><th class="cLen">len</th><th class="cScore">score</th><th class="cAct"></th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+</div>
+
+<div id="empty" class="empty">Enter an email and hit generate. Nothing leaves the browser unless you wire up the optional verifier.</div>
+
+<section class="card verify">
+  <div class="vHead"><span class="lbl">optional: auto-verify endpoint</span><span class="badge" id="vBadge">off</span></div>
+  <p class="hint">Paste a POST endpoint that accepts <code>{"email":"…","password":"…"}</code> and returns <code>{"ok":true|false}</code>. Runs 4 at a time and auto-marks hits.</p>
+  <div class="vRow">
+    <input id="vUrl" type="url" placeholder="https://your-worker.workers.dev/check" spellcheck="false">
+    <button id="vRun" class="secondary">verify all</button>
+  </div>
+  <div id="vLog" class="vLog"></div>
+</section>
+
+<p class="foot">Tier order: bare name → name+number → name+symbol → symbol+name → name+number+symbol → pairs → rule packs → leet. Local part is split on <code>. _ - +</code> and digits automatically.</p>
+</main>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const SYMS = ['!','@','#','$','_','-','.','*','?'];
+  const COMMON = ['1','12','123','1234','12345','123456','007','111','000','69','99','7','13'];
+  const MON = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const BASES = ['password','welcome','admin','qwerty','letmein','iloveyou','monkey','dragon','sunshine','princess','football','master'];
+  const WALKS = ['qwerty','asdfgh','zxcvbn','qazwsx','1qaz2wsx','1q2w3e4r','qwerty123','zaq12wsx','asdf1234'];
+  const HOSTFREE = ['gmail','outlook','hotmail','live','yahoo','icloud','me','proton','protonmail','aol','gmx','zoho','mail','yandex','tutanota'];
+  const LOGIN = {
+    'gmail.com':'https://accounts.google.com/','googlemail.com':'https://accounts.google.com/',
+    'outlook.com':'https://outlook.live.com/','hotmail.com':'https://outlook.live.com/','live.com':'https://outlook.live.com/',
+    'yahoo.com':'https://login.yahoo.com/','icloud.com':'https://www.icloud.com/',
+    'proton.me':'https://mail.proton.me/','protonmail.com':'https://mail.proton.me/',
+    'zoho.com':'https://accounts.zoho.com/','aol.com':'https://login.aol.com/','gmx.com':'https://www.gmx.com/'
+  };
+
+  let rows = [], found = new Set(), curEmail = '', alerts = false;
+
+  SYMS.forEach(s=>{
+    const l = document.createElement('label');
+    l.innerHTML = '<input type="checkbox" ' + (s==='!'||s==='@'||s==='.' ? 'checked' : '') + '><span>' + s + '</span>';
+    l.querySelector('input').dataset.sym = s;
+    $('symBoxes').appendChild(l);
+  });
+
+  $('cap').addEventListener('input', () => $('capOut').textContent = $('cap').value);
+
+  const leet = s => s.replace(/a/g,'4').replace(/e/g,'3').replace(/i/g,'1').replace(/o/g,'0').replace(/s/g,'5').replace(/t/g,'7');
+  const title = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+  function dobParts(iso){
+    if(!iso) return null;
+    const [y,m,d] = iso.split('-');
+    if(!y || !m || !d) return null;
+    return { y, m, d, y2: y.slice(2) };
+  }
+
+  function companyFrom(email){
+    const dom = (email.split('@')[1] || '').toLowerCase();
+    const label = dom.split('.')[0] || '';
+    if(!label || HOSTFREE.includes(label) || label.length < 3) return '';
+    return label;
+  }
+
+  function tokensFrom(email, extra){
+    const set = new Set();
+    const local = (email.split('@')[0] || '').toLowerCase();
+    local.split(/[._\-+\d]+/).filter(p => p.length >= 2).forEach(p => set.add(p));
+    if(local.length >= 2 && local.length <= 20 && !/\d/.test(local)) set.add(local);
+    (extra || '').split(/[,\s]+/).forEach(t => { t = t.trim().toLowerCase(); if(t.length >= 2) set.add(t); });
+    return [...set].slice(0,10);
+  }
+
+  function expandPattern(pat, t, ctx){
+    let out = [pat];
+    const reps = [
+      ['{n}', [t]], ['{N}', [title(t)]], ['{U}', [t.toUpperCase()]],
+      ['{y}', ctx.years], ['{yy}', ctx.years2],
+      ['{mon}', MON], ['{Mon}', MON.map(title)], ['{MON}', MON.map(m => m.toUpperCase())],
+      ['{m}', ctx.months], ['{d}', ctx.days],
+      ['{c}', ctx.company ? [ctx.company] : []], ['{C}', ctx.company ? [title(ctx.company)] : []],
+      ['{s}', ctx.syms.length ? ctx.syms : []], ['{num}', ctx.nums.length ? ctx.nums : []]
+    ];
+    for(const [ph, vals] of reps){
+      if(!pat.includes(ph) || !vals.length) continue;
+      const next = [];
+      for(const r of out){ for(const v of vals){ next.push(r.split(ph).join(v)); if(next.length > 400) break; } if(next.length > 400) break; }
+      out = next;
+    }
+    return out.filter(r => r && !/[{}]/.test(r));
+  }
+
+  function build(){
+    const email = $('email').value.trim().toLowerCase();
+    if(!email || !email.includes('@')){ toast('enter a valid email'); return; }
+    const toks = tokensFrom(email, $('names').value);
+    if(!toks.length){ toast('no usable name tokens — add a name'); return; }
+
+    const max = parseInt($('cap').value, 10);
+    const useDob = $('oDob').checked, useSym = $('oSym').checked, useCap = $('oCap').checked;
+    const useLeet = $('oLeet').checked, usePair = $('oPair').checked;
+
+    const nums = new Set(COMMON);
+    $('nums').value.split(/[,\s]+/).forEach(n => { n = n.trim(); if(/^\d{1,8}$/.test(n)) nums.add(n); });
+
+    const dp = dobParts($('dob').value);
+    const years = new Set(['2024','2025','2026']);
+    const years2 = new Set();
+    if(dp){ years.add(dp.y); years2.add(dp.y2); }
+
+    const syms = [...document.querySelectorAll('#symBoxes input:checked')].map(i => i.dataset.sym);
+    const numArr = [...nums];
+    const yearsArr = [...years], years2Arr = [...years2];
+    const months = dp ? [dp.m, dp.m.replace(/^0/,'')] : [];
+    const days = dp ? [dp.d, dp.d.replace(/^0/,'')] : [];
+    const company = companyFrom(email);
+
+    const map = new Map();
+    const add = (pw, score) => {
+      pw = (pw || '').trim();
+      if(pw.length < 3 || pw.length > 34) return;
+      if(!/^[\x20-\x7E]+$/.test(pw)) return;
+      const s = score - pw.length * 1.5 + (pw.length <= 12 ? 6 : 0);
+      if(!map.has(pw) || map.get(pw) < s) map.set(pw, s);
+    };
+    const forms = t => {
+      const set = new Set([t]);
+      if(useCap){ set.add(title(t)); set.add(t.toUpperCase()); }
+      if(useLeet){ const l = leet(t); set.add(l); set.add(title(l)); }
+      return [...set];
+    };
+
+    const tokForms = toks.map(forms);
+
+    tokForms.forEach(fs => {
+      fs.forEach(f => {
+        add(f, 1000);
+        numArr.forEach(n => add(f + n, 860));
+        if(useSym) syms.forEach(s => { add(f + s, 780); add(s + f, 700); });
+        numArr.forEach(n => { if(useSym) syms.forEach(s => { add(f + n + s, 640); add(f + s + n, 610); }); });
+        if(useSym) syms.forEach(s => syms.forEach(s2 => { if(s !== s2) add(f + s + s2, 560); }));
+        if(useCap) add(title(f) + '!' + title(f), 520);
+      });
+    });
+
+    if(usePair){
+      for(let i = 0; i < tokForms.length; i++){
+        for(let j = 0; j < tokForms.length; j++){
+          if(i === j) continue;
+          const a = tokForms[i][0], b = tokForms[j][0];
+          add(a + b, 620);
+          if(useCap) add(title(a) + title(b), 600);
+          if(useSym) syms.slice(0,4).forEach(s => { add(a + s + b, 500); add(a + b + s, 490); });
+          numArr.slice(0,10).forEach(n => add(a + b + n, 470));
+        }
+      }
+    }
+
+    if(useDob && dp){
+      const dvs = [dp.d+dp.m+dp.y, dp.d+dp.m+dp.y2, dp.y+dp.m+dp.d, dp.m+dp.d+dp.y, dp.d+dp.m, dp.m+dp.d, dp.y, dp.y2];
+      dvs.forEach(n => nums.add(n));
+      tokForms.forEach(fs => fs.for
